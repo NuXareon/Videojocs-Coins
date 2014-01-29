@@ -1,0 +1,202 @@
+<html>
+<head>
+	<style>
+		body: {	
+			margin: 0px;
+			padding: 0px;	
+		}
+	</style>
+	<script src="reqAnimFrame.js"></script>
+	<script src="keyboardJS.js"></script>
+</head>
+<body>
+	<canvas id="myCanvas"> </canvas>
+	
+	<script>
+
+		var canvas = document.getElementById("myCanvas");
+		var context = canvas.getContext('2d');
+
+		canvas.width = window.innerWidth-20;
+		canvas.height = window.innerHeight-20;
+
+		var debug = false;
+		var keyboard = new KeyboardJS(debug);
+		
+		var bitcoinIMG = new Image();
+		bitcoinIMG.src = "Bitcoin.jpg";
+		
+		var kirbyIMG = new Image();
+		kirbyIMG.src = "KNIDWave.jpg";
+
+		function Coin(){
+			this.rad = 20;
+			this.x = Math.random()*(canvas.width-this.rad*2)+this.rad;
+			this.y = Math.random()*(canvas.height-this.rad*2)+this.rad;
+			this.img = bitcoinIMG;
+		}
+
+		Coin.prototype = {
+
+			render : function(ctx) {
+				/*
+				ctx.beginPath();
+				ctx.arc(this.x,this.y,this.rad,0,2*Math.PI);
+				ctx.fillStyle="gold";
+				ctx.fill();
+				*/
+				
+				ctx.drawImage(this.img,this.x-this.rad,this.y-this.rad,this.rad*2,this.rad*2);
+			}
+		}
+
+		function Character(){
+			this.x = Math.random()*canvas.width;
+			this.y = Math.random()*canvas.height;
+			this.rad = 30;
+			this.vxmax = 16;
+			this.vymax = 16;
+			this.vx = 0;
+			this.vy = 0;
+			this.acc = 2;
+			this.score = 0;
+		}
+
+		Character.prototype = {
+
+			logic : function(coins){
+			
+				//calcul variacio velocitat
+				if (keyboard.char('D') || keyboard.char('A')) {
+					if (keyboard.char('D')) this.vx += this.acc;
+					if (keyboard.char('A')) this.vx -= this.acc;
+				}
+				else {
+					if (this.vx > 0) this.vx -= this.acc;
+					else if (this.vx < 0) this.vx += this.acc;
+				}
+				
+				if (keyboard.char('W') || keyboard.char('S')) {
+					if (keyboard.char('W')) this.vy -= this.acc;
+					if (keyboard.char('S')) this.vy += this.acc;
+				}
+				else {
+					//if (this.vy > 0) this.vy -= this.acc;
+					this.vy += this.acc/2; //gravity bitch!
+				}
+				
+				if (Math.abs(this.vx) > this.vxmax) {
+					if (this.vx > 0) this.vx = this.vxmax;
+					else this.vx = -this.vxmax;
+				}
+				
+				if (Math.abs(this.vy) > this.vymax) {
+					if (this.vy > 0) this.vy = this.vymax;
+					else this.vy = -this.vymax;
+				}
+				
+				// calculem posició
+				this.x += this.vx;
+				this.y += this.vy;
+				
+				//evitem sortir de la pantalla i reiniciem la valocitat si estem contra una paret
+				if (this.x < this.rad) { 
+					this.x = this.rad;
+					if (this.vx < 0) this.vx = 0;
+				}
+				if (this.y < this.rad) {
+					this.y = this.rad;
+					if (this.vy < 0) this.vy = 0;
+				}
+				if (this.x >= canvas.width-this.rad) {
+					this.x = canvas.width-this.rad;
+					if (this.vx > 0) this.vx = 0;
+				}
+				if (this.y >= canvas.height-this.rad) { 
+					this.y = canvas.height-this.rad;
+					if (this.vy > 0) this.vy = 0;
+				}
+				
+				//mengem monedes!
+				for (var i = coins.length-1; i >= 0; --i){
+					coin = coins[i];
+					var prox = Math.sqrt(Math.pow(this.x-coin.x,2) + Math.pow(this.y-coin.y,2));
+					if (prox < this.rad+coin.rad) {
+						coins.splice(i,1);
+						this.score += 1;
+					}
+				}				
+			},
+
+			render : function(ctx) {
+				/*ctx.beginPath();
+				ctx.arc(this.x,this.y,this.rad,0,2*Math.PI);
+				ctx.fillStyle="blue";
+				ctx.fill();
+				*/
+				
+				ctx.drawImage(kirbyIMG,this.x-this.rad,this.y-this.rad,this.rad*2,this.rad*2);
+				
+				ctx.fillStyle = "black";
+				ctx.font = "30px verdana";
+				ctx.fillText("SCORE: " + this.score,10,30);
+			}
+		}
+
+		//generem coins.
+		var coins = [];
+		for(var i = 0; i < 10; ++i) coins.push(new Coin());
+		var character = new Character();
+		var oldDate = +new Date();
+		var nextCoin = 0;
+		
+		var end = false;
+
+		function mainLoop() {
+
+			var newDate = +new Date();
+			var delta = newDate - oldDate;
+			oldDate = newDate;
+			
+			//generem monedes noves cada 2 seg.
+			nextCoin += delta;
+			if (nextCoin > 2000) {
+				nextCoin -= 2000;
+				coins.push(new Coin());
+			}
+
+			character.logic(coins);
+
+			context.clearRect(0,0,canvas.width,canvas.height);
+			for (var i = 0; i < coins.length; ++i) {
+				var coin = coins[i];
+				coin.render(context);
+			}
+			
+			// condicions de victoria
+			if (coins.length <= 0 || end) {
+				end = true;
+				context.clearRect(0,0,canvas.width,canvas.height);
+				context.fillStyle = "black";
+				context.font = "bold 250px rockwell";
+				context.fillText("YOU WIN!",canvas.width/2-550,canvas.height/2);
+				
+			}
+
+			character.render(context);
+		}
+
+		function loopCaller () {
+			requestAnimFrame(loopCaller);
+			mainLoop();
+		}
+		requestAnimFrame(loopCaller);
+
+		window.onresize = function () {
+			canvas.width = window.innerWidth-20;
+			canvas.height = window.innerHeight-20;
+			mainLoop();
+		}
+		window.onresize();
+	</script>
+</body>
